@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"time"
 )
 
 var APP_DIR, CACHE_DIR string
@@ -105,6 +106,7 @@ func getPicJob(w http.ResponseWriter, req *http.Request) {
 
 //制作缓存
 func makeCache(url string) (data *[]byte, err error) {
+	var respBody []byte
 	picId := getCacheId(url)
 	makingId[picId] = make(chan bool)
 	defer func() {
@@ -115,14 +117,22 @@ func makeCache(url string) (data *[]byte, err error) {
 	log.Println("making cache, url:", url)
 
 	//请求远端
-	resp, err := http.Get(url)
-	if err != nil {
-		log.Println("request remote fail, url:", url)
-		return nil, err
+	for i := 0; i < 5; i++ { //最大重试次数
+		resp, err := http.Get(url)
+		if err != nil {
+			log.Println("request remote fail, exiting, url:", url)
+			return nil, err
+		}
+		if resp.StatusCode != 200 {
+			log.Println("request remote fail, code:", resp.StatusCode, "waiting for retry")
+			time.Sleep(500 * time.Millisecond)
+		} else {
+			respBody, _ = ioutil.ReadAll(resp.Body)
+			resp.Body.Close()
+			log.Println("request remote done, size:", len(respBody), "id:", picId)
+		}
+
 	}
-	defer resp.Body.Close()
-	respBody, err := ioutil.ReadAll(resp.Body)
-	log.Println("request remote done, size:", len(respBody), "id:", picId)
 
 	//存入缓存
 	err = cacheWrite(picId, &respBody)
