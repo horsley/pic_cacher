@@ -93,7 +93,12 @@ func getPic(w http.ResponseWriter, req *http.Request) {
 func getPicJob(w http.ResponseWriter, req *http.Request) {
 	req.ParseForm()
 	for _, url := range req.PostForm["url"] {
-		go makeCache(url)
+		go func() {
+			picId := getCacheId(url)
+			if !cacheExist(picId) {
+				makeCache(url)
+			}
+		}()
 	}
 	w.Write([]byte("Job Received!"))
 }
@@ -103,9 +108,8 @@ func makeCache(url string) (data *[]byte, err error) {
 	picId := getCacheId(url)
 	makingId[picId] = make(chan bool)
 	defer func() {
-		log.Println("in makeCache, job done")
 		makingId[picId] <- false
-		log.Println("in makeCache, notify done")
+		log.Println("makeCache done, id:", picId)
 	}()
 
 	log.Println("making cache, url:", url)
