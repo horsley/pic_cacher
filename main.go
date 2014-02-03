@@ -57,8 +57,20 @@ func getPic(w http.ResponseWriter, req *http.Request) {
 
 	if !cacheExist(picId) {
 		log.Println("cache miss, id:", picId)
+		go func() {
+			for { //等待makeCache完成
+				if lock, ok := makingId[picId]; ok {
+					<-lock //完成了
+					close(lock)
+					delete(makingId, picId)
+					break
+				}
+				runtime.Gosched()
+			}
+		}()
 		cacheContent, err = makeCache(picUrl)
 		if err != nil {
+			log.Println("make cache error, id:", picId, "error:", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -91,7 +103,9 @@ func makeCache(url string) (data *[]byte, err error) {
 	picId := getCacheId(url)
 	makingId[picId] = make(chan bool)
 	defer func() {
+		log.Println("in makeCache, job done")
 		makingId[picId] <- false
+		log.Println("in makeCache, notify done")
 	}()
 
 	log.Println("making cache, url:", url)
@@ -112,7 +126,7 @@ func makeCache(url string) (data *[]byte, err error) {
 		log.Println("cache save fail, id:", picId)
 		return nil, err
 	} else {
-		log.Println("cache save secceed, id:", picId)
+		log.Println("cache save succeed, id:", picId)
 		return &respBody, nil
 	}
 }
