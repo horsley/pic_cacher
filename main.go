@@ -125,7 +125,7 @@ func makeCache(url string) (data *[]byte, err error) {
 		}
 		if resp.StatusCode != 200 {
 			log.Println("request remote fail, code:", resp.StatusCode, "waiting for retry")
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep((i + 1) * 500 * time.Millisecond)
 		} else {
 			respBody, _ = ioutil.ReadAll(resp.Body)
 			resp.Body.Close()
