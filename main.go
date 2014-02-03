@@ -92,6 +92,9 @@ func makeCache(url string) (err error) {
 	var respBody []byte
 	picId := getCacheId(url)
 
+	if _, ok := makingId[picId]; !ok {
+		makingId[picId] = &sync.Mutex{}
+	}
 	makingId[picId].Lock()
 	defer makingId[picId].Unlock()
 	if cacheExist(picId) {
