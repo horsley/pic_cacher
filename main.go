@@ -2,6 +2,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 )
@@ -42,11 +44,19 @@ func getPic(w http.ResponseWriter, req *http.Request) {
 	var err error
 
 	req.ParseForm()
-	picUrl := req.Form.Get("url")
-	if picUrl == "" {
+	picUrlcoded := req.Form.Get("url")
+	if picUrlcoded == "" {
 		w.Write([]byte("param error"))
 		return
 	}
+	picUrlcoded = picUrlcoded + strings.Repeat("=", len(picUrlcoded)%4) //补齐尾部填充
+	picUrldecoded, err := base64.URLEncoding.DecodeString(picUrlcoded)
+	if err != nil {
+		log.Println("param decode error, param coded:", picUrlcoded)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	picUrl := string(picUrldecoded)
 	picId := getCacheId(picUrl)
 	log.Println("requesting pic id:", picId)
 
