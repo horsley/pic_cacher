@@ -18,6 +18,7 @@ import (
 
 var APP_DIR, CACHE_DIR string
 var makingId map[string]*sync.Mutex
+var makingIdLock *sync.RWMutex
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
@@ -103,13 +104,22 @@ func getPicJob(w http.ResponseWriter, req *http.Request) {
 //制作缓存
 func makeCache(url string) (err error) {
 	var respBody []byte
+	var mcLock *sync.Mutex
+	var ok bool
 	picId := getCacheId(url)
 
-	if _, ok := makingId[picId]; !ok {
-		makingId[picId] = &sync.Mutex{}
+	makingIdLock.RLock() //读写锁
+	if mcLock, ok = makingId[picId]; !ok {
+		makingIdLock.RUnlock()
+
+		makingIdLock.Lock()
+		mcLock = &sync.Mutex{}
+		makingIdLock.Unlock()
+	} else {
+		makingIdLock.RUnlock()
 	}
-	makingId[picId].Lock()
-	defer makingId[picId].Unlock()
+	mcLock.Lock()
+	defer mcLock.Unlock()
 	if cacheExist(picId) {
 		//可能别的goroutine也在做这个id的cache,拿到锁正是别人做完的时候
 		log.Println("make cache job done by other goroutine")
