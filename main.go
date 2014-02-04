@@ -3,6 +3,7 @@ package main
 
 import (
 	"encoding/base64"
+	"errors"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -129,6 +130,10 @@ func makeCache(url string) (err error) {
 			log.Println("request remote done, size:", len(respBody), "id:", picId)
 			break
 		}
+	}
+
+	if len(respBody) == 0 {
+		return errors.New("makeCache empty response, url:", url)
 	}
 
 	//存入缓存
