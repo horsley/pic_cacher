@@ -34,6 +34,7 @@ func main() {
 	}
 
 	makingId = make(map[string]*sync.Mutex)
+	makingIdLock = &sync.RWMutex{}
 
 	http.HandleFunc("/pic", getPic)
 	http.HandleFunc("/job", getPicJob)
