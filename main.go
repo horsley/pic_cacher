@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 )
@@ -57,6 +58,7 @@ func getPic(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	picUrl := string(picUrldecoded)
+	picUrl = strings.TrimRight(picUrl, string(0x0)) //rtrim tailing zero
 	picId := getCacheId(picUrl)
 	log.Println("requesting pic id:", picId)
 
@@ -88,6 +90,7 @@ func getPicJob(w http.ResponseWriter, req *http.Request) {
 	req.ParseForm()
 	for _, url := range req.PostForm["url"] {
 		go func() {
+			url = strings.TrimRight(url, string(0x0))
 			picId := getCacheId(url)
 			if !cacheExist(picId) {
 				makeCache(url)
