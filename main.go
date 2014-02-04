@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
 )
@@ -49,8 +48,8 @@ func getPic(w http.ResponseWriter, req *http.Request) {
 		w.Write([]byte("param error"))
 		return
 	}
-	picUrlcoded = picUrlcoded + strings.Repeat("=", len(picUrlcoded)%4) //补齐尾部填充
-	picUrldecoded, err := base64.URLEncoding.DecodeString(picUrlcoded)
+	coding := base64.NewEncoding("VPQRXAZabBCDNkYcWMIist5EFLvlmnGHu34wxyz0hSTJKOdefgU6j12opqr978-_")
+	picUrldecoded, err := coding.DecodeString(picUrlcoded)
 	if err != nil {
 		log.Println("param decode error, param coded:", picUrlcoded)
 		w.WriteHeader(http.StatusBadRequest)
