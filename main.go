@@ -133,7 +133,7 @@ func makeCache(url string) (err error) {
 	}
 
 	if len(respBody) == 0 {
-		return errors.New("makeCache empty response, url:", url)
+		return errors.New("makeCache empty response, url:" + url)
 	}
 
 	//存入缓存
