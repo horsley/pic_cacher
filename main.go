@@ -129,21 +129,26 @@ func makeCache(url string) (err error) {
 
 	log.Println("making cache, url:", url)
 	//请求远端
-	for i := 0; i < 5; i++ { //最大重试次数
+	for i := 0; i < 3; i++ { //最大重试次数
 		resp, err := http.Get(url)
 		if err != nil {
 			log.Println("request remote fail, exiting, url:", url)
 			return err
 		}
 		if resp.StatusCode != 200 {
-			log.Println("request remote fail, code:", resp.StatusCode, "waiting for retry")
-			time.Sleep(time.Duration((i+1)*500) * time.Millisecond)
+			if resp.StatusCode == 404 { //404 not retry
+				log.Println("request remote fail, 404")
+			} else {
+				log.Println("request remote fail, code:", resp.StatusCode, "waiting for retry")
+				time.Sleep(time.Duration((i+1)*500) * time.Millisecond)
+			}
 		} else {
 			respBody, _ = ioutil.ReadAll(resp.Body)
-			defer resp.Body.Close()
+			resp.Body.Close()
 			log.Println("request remote done, size:", len(respBody), "id:", picId)
 			break
 		}
+		resp.Body.Close()
 	}
 
 	if len(respBody) == 0 {
