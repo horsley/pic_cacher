@@ -18,7 +18,9 @@ import (
 
 var APP_DIR, CACHE_DIR string
 var makingId map[string]*sync.Mutex
-var makingIdLock *sync.RWMutex
+var picFailCount map[string]int
+var picSuccessCount map[string]int
+var makingIdLock, failCountLock, successCountLock *sync.RWMutex
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
@@ -34,10 +36,14 @@ func main() {
 	}
 
 	makingId = make(map[string]*sync.Mutex)
+	picFailCount = make(map[string]int)
 	makingIdLock = &sync.RWMutex{}
+	failCountLock = &sync.RWMutex{}
+	successCountLock = &sync.RWMutex{}
 
 	http.HandleFunc("/pic", getPic)
 	http.HandleFunc("/job", getPicJob)
+	http.HandleFunc("/fail2refresh.js", fail2refresh)
 	http.ListenAndServe(":2537", nil)
 }
 
@@ -63,6 +69,7 @@ func getPic(w http.ResponseWriter, req *http.Request) {
 	picUrl = strings.TrimRight(picUrl, string(0x0)) //rtrim tailing zero
 	picId := getCacheId(picUrl)
 	log.Println("requesting pic id:", picId)
+	sessionId := req.Form.Get("sid")
 
 	if !cacheExist(picId) {
 		log.Println("cache miss, id:", picId)
@@ -70,6 +77,9 @@ func getPic(w http.ResponseWriter, req *http.Request) {
 		if err := makeCache(picUrl); err != nil {
 			log.Println("make cache error, id:", picId, "error:", err)
 			w.WriteHeader(http.StatusInternalServerError)
+			failCountLock.Lock()
+			picFailCount[sessionId]++
+			failCountLock.Unlock()
 			return
 		}
 	} else {
@@ -85,6 +95,9 @@ func getPic(w http.ResponseWriter, req *http.Request) {
 	}
 	w.Write(*cacheContent)
 	log.Println("serve pic done, id:", picId)
+	successCountLock.Lock()
+	picSuccessCount[sessionId]++
+	successCountLock.Unlock()
 }
 
 //任务预处理
@@ -100,6 +113,25 @@ func getPicJob(w http.ResponseWriter, req *http.Request) {
 		}()
 	}
 	w.Write([]byte("Job Received!"))
+}
+
+//失败计数
+func fail2refresh(w http.ResponseWriter, req *http.Request) {
+	req.ParseForm()
+	sessionId := req.Form.Get("sid")
+	for {
+		if picFailCount[sessionId] > 5 {
+			w.Write([]byte("window.location.reload();"))
+			break
+		} else if picSuccessCount[sessionId] > 5 {
+			w.Write([]byte("/* normal */"))
+			break
+		}
+		time.Sleep(time.Duration(50) * time.Millisecond)
+		runtime.Gosched()
+	}
+
+	delete(picFailCount, sessionId)
 }
 
 //制作缓存
@@ -129,7 +161,7 @@ func makeCache(url string) (err error) {
 
 	log.Println("making cache, url:", url)
 	//请求远端
-	for i := 0; i < 3; i++ { //最大重试次数
+	for i := 0; i < 2; i++ { //最大重试次数
 		resp, err := http.Get(url)
 		if err != nil {
 			log.Println("request remote fail, exiting, url:", url)
@@ -138,6 +170,7 @@ func makeCache(url string) (err error) {
 		if resp.StatusCode != 200 {
 			if resp.StatusCode == 404 { //404 not retry
 				log.Println("request remote fail, 404")
+				break
 			} else {
 				log.Println("request remote fail, code:", resp.StatusCode, "waiting for retry")
 				time.Sleep(time.Duration((i+1)*500) * time.Millisecond)
